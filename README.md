@@ -1,7 +1,6 @@
 # Demo project using Quarkus
 
 ## Prerequisites
-
 * Docker installed: https://www.docker.com/
 * running database: ```docker run --name postgres-quarkus -p 5432:5432 -e POSTGRES_PASSWORD=somePassword -d postgres```
 * AWS CLI installed: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html

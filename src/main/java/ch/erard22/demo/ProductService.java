@@ -1,9 +1,9 @@
 package ch.erard22.demo;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.transaction.Transactional;
-import java.util.Collections;
 import java.util.List;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 
 @ApplicationScoped
 public class ProductService {
@@ -25,5 +25,4 @@ public class ProductService {
     public List<Product> searchByName(String name) {
         return Product.find("name", name).list();
     }
-
 }

@@ -18,14 +18,15 @@ public class ProductService {
 
     @Transactional
     public Product create(Product product) {
-        return repository.save(product);
+        repository.persist(product);
+        return product;
     }
 
     public Product getById(Long id) {
-        return repository.getById(id);
+        return repository.findById(id);
     }
 
     public List<Product> searchByName(String name) {
-        return repository.searchByName(name);
+        return repository.find("name", name).list();
     }
 }

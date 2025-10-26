@@ -18,7 +18,12 @@
 
 ## How to turn your REST service into an AWS lambda
 1) add the AWS lambda extension: ```mvn quarkus:add-extension -Dextensions="quarkus-amazon-lambda-rest"```
-2) create a native linux binary using a docker image: ```mvn clean package -Pnative -Dquarkus.native.container-build=true -Dnative-image.xmx=6g```
+2) create a native linux binary using a docker image: 
+    ```
+    mvn clean install -Dnative -DskipTests \
+   -Dquarkus.native.container-build=true \
+   -Dquarkus.native.native-image-xmx=6g 
+    ```
 3) create a folder for cdk: ```mkdir cdk; cd cdk```
 4) initiate the cdk project: ```cdk init app --language typescript```
 5) define the cdk stack in the file ```lib/cdk-stack.ts```
@@ -32,43 +37,47 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
 
 export class CdkStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props);
+   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+      super(scope, id, {
+         ...props,
+         stackName: 'Quarkus-Lambda-Demo',
+      });
 
-    const dbName = 'QuarkusDB';
-    const vpc = new ec2.Vpc(this, 'QuarkusAppVPC');
+      const dbName = 'QuarkusDB';
+      const vpc = new ec2.Vpc(this, 'QuarkusAppVPC');
 
-    // database
-    const postgres = new rds.DatabaseInstance(this, 'Postgres', {
-      engine: rds.DatabaseInstanceEngine.postgres({version: rds.PostgresEngineVersion.VER_12_8}),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PUBLIC,
-      },
-      // never do this again!
-      credentials: rds.Credentials.fromPassword('postgres', SecretValue.plainText('somePassword')),
-      databaseName: dbName
-    })
-    postgres.connections.allowFromAnyIpv4(ec2.Port.tcp(5432))
+      // database
+      const postgres = new rds.DatabaseInstance(this, 'Postgres', {
+         engine: rds.DatabaseInstanceEngine.postgres({version: rds.PostgresEngineVersion.VER_15}),
+         instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.SMALL),
+         vpc,
+         vpcSubnets: {
+            subnetType: ec2.SubnetType.PUBLIC,
+         },
+         // never do this again!
+         credentials: rds.Credentials.fromPassword('postgres', SecretValue.unsafePlainText('somePassword')),
+         databaseName: dbName
+      })
+      postgres.connections.allowFromAnyIpv4(ec2.Port.tcp(5432))
 
-    // The Quarkus lambda
-    const quarkusMessageLambda = new lambda.Function(this, "QuarkusMessageLambda", {
-      runtime: lambda.Runtime.PROVIDED_AL2,
-      functionName: 'quarkus-lambda',
-      memorySize: 512,
-      handler: "io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest",
-      code: lambda.Code.fromAsset('../target/function.zip'),
-      environment: {
-        QUARKUS_DATASOURCE_JDBC_URL: `jdbc:postgresql://${postgres.dbInstanceEndpointAddress}:${postgres.dbInstanceEndpointPort}/${dbName}`
-      }
-    });
+      // The Quarkus lambda
+      const quarkusMessageLambda = new lambda.Function(this, "QuarkusMessageLambda", {
+         runtime: lambda.Runtime.PROVIDED_AL2023,
+         architecture: lambda.Architecture.ARM_64,
+         functionName: 'quarkus-lambda',
+         memorySize: 512,
+         handler: "io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest",
+         code: lambda.Code.fromAsset('../target/function.zip'),
+         environment: {
+            QUARKUS_DATASOURCE_JDBC_URL: `jdbc:postgresql://${postgres.dbInstanceEndpointAddress}:${postgres.dbInstanceEndpointPort}/${dbName}`
+         }
+      });
 
-    // API gateway
-    new apigw.LambdaRestApi(this, 'Endpoint', {
-      handler: quarkusMessageLambda
-    });
-  }
+      // API gateway
+      new apigw.LambdaRestApi(this, 'Endpoint', {
+         handler: quarkusMessageLambda
+      });
+   }
 }
 ```
 6) deploy the stack: ```cdk deploy```
